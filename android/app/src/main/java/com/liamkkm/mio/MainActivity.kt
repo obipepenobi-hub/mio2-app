@@ -82,6 +82,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+        // Zurück-Taste/-Geste: erst Fenster schließen, dann Kartenansicht zurücksetzen – die App schließt sich nie
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                web.evaluateJavascript(
+                    "(()=>{if(document.querySelector('.sheet.open,#orgMenu.open')){document.getElementById('scrim').click();return 1}" +
+                        "if(document.getElementById('regionTitle').textContent!=='Mio²'||document.querySelector('#chips .chip.on')){document.getElementById('btnBack').click()}return 1})()", null)
+            }
+        })
         web.loadUrl("https://appassets.androidplatform.net/index.html")
         takeShare(intent)
         // beim Start still nach Updates suchen
@@ -165,17 +173,6 @@ class MainActivity : AppCompatActivity() {
                         else -> Toast.makeText(this@MainActivity, "Mio² ${BuildConfig.VERSION_NAME} ist aktuell", Toast.LENGTH_SHORT).show()
                     }
                 }
-            }
-        }
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        val js = "(()=>{if(document.querySelector('.sheet.open,#orgMenu.open')){document.getElementById('scrim').click();return 1}return 0})()"
-        web.evaluateJavascript(js) { r ->
-            if (r != "1") {
-                @Suppress("DEPRECATION")
-                super.onBackPressed()
             }
         }
     }
