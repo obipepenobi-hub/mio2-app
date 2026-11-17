@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" translate="no">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -32,9 +32,9 @@
     <div id="chips" class="chips"></div>
     <div id="previewWrap"></div>
     <nav id="tabbar">
-      <button class="tab" id="tabLibrary"><svg viewBox="0 0 24 24"><path d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2V4z"/><path d="M5 18a2 2 0 012-2h11"/></svg><span>Library</span></button>
+      <button class="tab" id="tabLibrary"><svg viewBox="0 0 24 24"><path d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2V4z"/><path d="M5 18a2 2 0 012-2h11"/></svg><span>Bibliothek</span></button>
       <button class="plus" id="btnAdd" aria-label="Spot hinzufügen"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-      <button class="tab" id="tabRandom"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="15" r="1.2"/><circle cx="15" cy="9" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg><span>Randomize</span></button>
+      <button class="tab" id="tabRandom"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="15" r="1.2"/><circle cx="15" cy="9" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg><span>Zufall</span></button>
     </nav>
   </section>
 
@@ -48,7 +48,7 @@
     <textarea id="addInput" rows="2" placeholder="TikTok-/Instagram-Link (gern samt Beschreibung) oder Ort, z. B. „Píllaro, Ecuador“" autocomplete="off"></textarea>
     <textarea id="addText" class="note" rows="4" style="display:none;margin-top:10px" placeholder="Beschreibung des Reels hier einfügen (Orte, Hashtags …)"></textarea>
     <div class="row-btns">
-      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn ghost" data-close>Abbrechen</button>
       <button class="btn primary" id="btnFind">Finden</button>
     </div>
   </div>
@@ -59,25 +59,25 @@
     <div class="logo small">Mio²</div>
     <div class="load-center">
       <div class="bigLogo">Mio²<svg viewBox="0 0 60 60" class="lupe"><circle cx="26" cy="26" r="17"/><path d="M39 39l16 16"/></svg></div>
-      <div class="load-t">Having a look…</div>
-      <div class="load-s" id="loadSub">Reading your video</div>
+      <div class="load-t">Moment, ich schaue nach…</div>
+      <div class="load-s" id="loadSub">Video wird gelesen</div>
     </div>
-    <button class="btn ghost center" id="btnLoadCancel">Cancel</button>
+    <button class="btn ghost center" id="btnLoadCancel">Abbrechen</button>
   </div>
 
   <!-- Found -->
   <div class="sheet full" id="sheetFound">
     <div class="grab"></div>
-    <div class="found-head"><div class="logo small">Mio²</div><span id="sharedToday" class="shared">0 shared today</span></div>
+    <div class="found-head"><div class="logo small">Mio²</div><span id="sharedToday" class="shared">0 heute geteilt</span></div>
     <div class="mascot-wrap"><span class="streak" id="streak">1 🔥</span><div id="mascot"></div></div>
-    <h2 id="foundTitle" class="found-t">Mio² found 1 spot!</h2>
+    <h2 id="foundTitle" class="found-t">Mio² hat 1 Spot gefunden!</h2>
     <div id="sourceCard" class="source-card"></div>
     <div id="foundList" class="found-list"></div>
     <div class="found-foot">
-      <div class="addto"><span>Add to</span><div id="collChips" class="coll-chips"></div></div>
+      <div class="addto"><span>Hinzufügen zu</span><div id="collChips" class="coll-chips"></div></div>
       <div class="row-btns">
-        <button class="btn ghost" id="btnFoundCancel">Cancel</button>
-        <button class="btn primary" id="btnSave"><svg viewBox="0 0 24 24" class="ic"><path d="M7 4h10v16l-5-4-5 4z"/></svg>Save Spots <b id="saveCount">1</b></button>
+        <button class="btn ghost" id="btnFoundCancel">Abbrechen</button>
+        <button class="btn primary" id="btnSave"><svg viewBox="0 0 24 24" class="ic"><path d="M7 4h10v16l-5-4-5 4z"/></svg>Spots speichern <b id="saveCount">1</b></button>
       </div>
     </div>
   </div>
@@ -96,15 +96,15 @@
       <div id="dTags" class="tags"></div>
       <div id="dTldr" class="tldr"></div>
       <p id="dDesc" class="d-desc"></p>
-      <textarea id="dNote" class="note" rows="2" placeholder="Deine Notiz, z. B. „must visit at sunrise“"></textarea>
+      <textarea id="dNote" class="note" rows="2" placeholder="Deine Notiz, z. B. „unbedingt zum Sonnenaufgang besuchen“"></textarea>
       <div id="dGallery" class="gallery"></div>
       <div id="dPost"></div>
       <div id="dColls" class="coll-chips detail-colls"></div>
     </div>
     <div class="d-foot">
-      <a class="round big soft" id="dDirections" target="_blank" rel="noopener" aria-label="Directions"><svg viewBox="0 0 24 24"><path d="M21 3L3 11l7 3 3 7z"/></svg></a>
-      <a class="btn soft grow" id="dSource" target="_blank" rel="noopener">source</a>
-      <button class="btn primary grow" id="dOrganise"><svg viewBox="0 0 24 24" class="ic"><path d="M7 4h10v16l-5-4-5 4z"/></svg>organise</button>
+      <a class="round big soft" id="dDirections" target="_blank" rel="noopener" aria-label="Route"><svg viewBox="0 0 24 24"><path d="M21 3L3 11l7 3 3 7z"/></svg></a>
+      <a class="btn soft grow" id="dSource" target="_blank" rel="noopener">Quelle</a>
+      <button class="btn primary grow" id="dOrganise"><svg viewBox="0 0 24 24" class="ic"><path d="M7 4h10v16l-5-4-5 4z"/></svg>Ordnen</button>
     </div>
   </div>
 
@@ -117,7 +117,7 @@
 
   <!-- Trip -->
   <div class="sheet trip" id="sheetTrip">
-    <button class="plan-ai" id="btnPlan"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.600L6 9l4.200-1.400zM18 15l.8 2.200L21 18l-2.200.8L18 21l-.8-2.200L15 18l2.200-.8z"/></svg>Auto-plan</button>
+    <button class="plan-ai" id="btnPlan"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.600L6 9l4.200-1.400zM18 15l.8 2.200L21 18l-2.200.8L18 21l-.8-2.200L15 18l2.200-.8z"/></svg>Auto-Plan</button>
     <div class="trip-card">
       <div class="trip-top">
         <h2 id="tName" class="trip-t"></h2>
@@ -125,10 +125,10 @@
       </div>
       <div class="trip-meta"><span id="tCities"></span></div>
       <div class="trip-dates"><input type="date" id="tStart"><span>–</span><input type="date" id="tEnd"></div>
-      <div class="trip-tabs"><button id="tabIt" class="on">Itinerary</button><button id="tabUn">Unscheduled</button></div>
+      <div class="trip-tabs"><button id="tabIt" class="on">Reiseplan</button><button id="tabUn">Nicht eingeplant</button></div>
       <div id="dayChips" class="chips day-chips"></div>
       <div id="tripBody" class="trip-body"></div>
-      <div class="trip-foot"><button class="btn ghost" id="btnTripClose">Schließen</button><a class="btn orange" id="tDirections" target="_blank" rel="noopener">Directions</a></div>
+      <div class="trip-foot"><button class="btn ghost" id="btnTripClose">Schließen</button><a class="btn orange" id="tDirections" target="_blank" rel="noopener">Route</a></div>
     </div>
   </div>
 
@@ -137,16 +137,16 @@
     <div class="grab"></div>
     <div class="dice-stage"><div class="die d1"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="die d2"><i></i><i></i><i></i></div></div>
     <div class="roll-loc" id="rollLoc"></div>
-    <h2 class="roll-t">Where should we go?</h2>
+    <h2 class="roll-t">Wohin soll es gehen?</h2>
     <div id="rollChips" class="roll-chips"></div>
-    <button class="btn black" id="btnRoll">Roll</button>
+    <button class="btn black" id="btnRoll">Würfeln</button>
   </div>
 
   <!-- Organise radial menu -->
   <div id="orgMenu">
-    <button data-o="coll"><span class="ic dark"><svg viewBox="0 0 24 24"><path d="M4 8h16v10H4zM6 5h12M8 2.500h8"/></svg></span><em>Collection</em></button>
+    <button data-o="coll"><span class="ic dark"><svg viewBox="0 0 24 24"><path d="M4 8h16v10H4zM6 5h12M8 2.500h8"/></svg></span><em>Sammlung</em></button>
     <button data-o="trip"><span class="ic orange"><svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a2 2 0 000-4z"/></svg></span><em>Trip</em></button>
-    <button data-o="rm"><span class="ic dark"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></span><em>Remove</em></button>
+    <button data-o="rm"><span class="ic dark"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></span><em>Entfernen</em></button>
   </div>
 
   <!-- Generic picker -->

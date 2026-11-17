@@ -4,6 +4,33 @@
   const $ = s => document.querySelector(s);
   const KEY = 'mio.v1';
   const CATS = { Attraction: '🏛', Restaurant: '🍽', Cafe: '☕', Bar: '🍸', Hotel: '🛏', Nature: '🌿', Shopping: '🛍' };
+  // Anzeige auf Deutsch (gespeichert bleiben die englischen Schlüssel)
+  const CATD = { Attraction: 'Sehenswürdigkeit', Restaurant: 'Restaurant', Cafe: 'Café', Bar: 'Bar', Hotel: 'Hotel', Nature: 'Natur', Shopping: 'Shopping', 'Must Do': 'Favoriten' };
+  const GROUPD = { Any: 'Alle', Eat: 'Essen', 'Night out': 'Ausgehen', Adventure: 'Abenteuer', Shopping: 'Shoppen', Sights: 'Sehenswertes' };
+  const dc = c => CATD[c] || c;
+  const TAGD = { restaurant: 'Restaurant', cafe: 'Café', bar: 'Bar', pub: 'Kneipe', hotel: 'Hotel', hostel: 'Hostel', attraction: 'Attraktion', museum: 'Museum', viewpoint: 'Aussichtspunkt', beach: 'Strand', park: 'Park', peak: 'Gipfel', castle: 'Burg', church: 'Kirche', 'place of worship': 'Gotteshaus', theatre: 'Theater', gallery: 'Galerie', zoo: 'Zoo', artwork: 'Kunstwerk', monument: 'Denkmal', memorial: 'Gedenkstätte', waterfall: 'Wasserfall', 'nature reserve': 'Naturschutzgebiet', 'fast food': 'Fast Food', 'fast_food': 'Fast Food', nightclub: 'Nachtclub', bakery: 'Bäckerei', marketplace: 'Markt', mall: 'Einkaufszentrum', supermarket: 'Supermarkt', 'guest house': 'Pension', motel: 'Motel', island: 'Insel', lake: 'See', water: 'Wasser', cave: 'Höhle', ruins: 'Ruine', fort: 'Festung', tower: 'Turm', bridge: 'Brücke', garden: 'Garten', italian: 'italienisch', pizza: 'Pizza', sushi: 'Sushi', burger: 'Burger', japanese: 'japanisch', chinese: 'chinesisch', indian: 'indisch', mexican: 'mexikanisch', thai: 'thailändisch', greek: 'griechisch', french: 'französisch', spanish: 'spanisch', german: 'deutsch', turkish: 'türkisch', vietnamese: 'vietnamesisch', seafood: 'Meeresfrüchte', 'steak house': 'Steakhaus', 'coffee shop': 'Kaffeehaus', regional: 'regional', local: 'lokal', international: 'international', vegan: 'vegan', vegetarian: 'vegetarisch', kebab: 'Kebab', 'ice cream': 'Eis' };
+  const tagDe = t => TAGD[String(t).toLowerCase()] || t;
+  const GERMAN_RE = /\b(und|der|die|das|ist|nicht|mit|ein|eine|für|auf|zu|im|den|von|wir|ich|auch|sehr)\b/gi;
+  const isGerman = t => ((t || '').match(GERMAN_RE) || []).length >= 3;
+  // Automatische Übersetzung nach Deutsch (MyMemory, ohne Schlüssel); bei Fehlern bleibt der Originaltext
+  const trCache = new Map();
+  async function toDe(text) {
+    text = (text || '').trim();
+    if (!text || isGerman(text)) return text;
+    if (trCache.has(text)) return trCache.get(text);
+    const parts = text.match(/[^.!?\n]+[.!?]*\s*|\n+/g) || [text], chunks = [''];
+    for (const p of parts) { if ((chunks[chunks.length - 1] + p).length > 420) chunks.push(''); chunks[chunks.length - 1] += p; }
+    let out = '';
+    for (const c of chunks) {
+      if (!c.trim()) { out += c; continue; }
+      try {
+        const r = await fetch('https://api.mymemory.translated.net/get?langpair=Autodetect|de&q=' + encodeURIComponent(c.slice(0, 450)));
+        const j = await r.json(); const t = j.responseData?.translatedText;
+        out += (j.responseStatus == 200 && t && !/MYMEMORY WARNING|QUERY LENGTH/i.test(t)) ? t + (/\s$/.test(c) ? ' ' : '') : c;
+      } catch { out += c; }
+    }
+    out = out.trim(); trCache.set(text, out); return out;
+  }
   const GROUPS = { Eat: ['Restaurant', 'Cafe'], 'Night out': ['Bar'], Adventure: ['Nature'], Shopping: ['Shopping'], Sights: ['Attraction', 'Hotel'] };
 
   // ---------- State ----------
@@ -34,7 +61,7 @@
   $('#mascot').innerHTML = '<svg viewBox="0 0 90 68"><path d="M18 52c-6-2-8-12-2-16 2-12 12-16 22-12 8-6 20-4 24 6 6 4 8 14 2 20" /><path d="M24 30l-3-12 10 6M52 24l8-10 2 12"/><circle cx="34" cy="38" r="1.6" fill="#2a2a28"/><circle cx="48" cy="38" r="1.6" fill="#2a2a28"/><path d="M38 44q3 3 6 0M16 52c10 8 40 8 58-2 6-4 8-10 4-14M72 50c8 2 12-4 8-10"/></svg>';
   const dirUrl = s => `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}`;
   const flagUrl = cc => `https://flagcdn.com/w80/${(cc || 'xx').toLowerCase()}.png`;
-  const fmtDate = d => d ? new Date(d + 'T00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) : '';
+  const fmtDate = d => d ? new Date(d + 'T00:00').toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: '2-digit' }) : '';
 
   function guessCat(r) {
     const c = r.class, t = r.type;
@@ -58,17 +85,22 @@
   async function enrich(spot) {
     const names = [spot.name, spot.short];
     let best = null;
-    outer: for (const lang of ['en', 'es', 'de']) for (const n of names) {
+    outer: for (const lang of ['de', 'en', 'es']) for (const n of names) {
       const w = await wiki(n, lang);
       if (!w) continue;
-      if (w.img) { best = { ...w, desc: w.desc || best?.desc }; break outer; }
+      w.lang = lang;
+      if (w.img) { best = { ...w, desc: w.desc || best?.desc, lang: w.desc ? lang : best?.lang }; break outer; }
       if (w.desc && !best) best = w;
     }
-    if (best) { spot.img = best.img; spot.hero = best.orig || best.img; spot.desc = best.desc; }
+    if (best) {
+      spot.img = best.img; spot.hero = best.orig || best.img;
+      spot.desc = best.desc && best.lang !== 'de' ? await toDe(best.desc) : best.desc;
+    }
+    spot.dl = 1;
     return spot;
   }
   async function geocode(q) {
-    const u = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&extratags=1&limit=5&accept-language=en&q=${encodeURIComponent(q)}`;
+    const u = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&extratags=1&limit=5&accept-language=de&q=${encodeURIComponent(q)}`;
     const r = await fetch(u); if (!r.ok) throw new Error('geocode');
     return (await r.json()).map(r => {
       const a = r.address || {};
@@ -79,7 +111,7 @@
         id: 's' + r.place_id, name: `${name}${a.country ? ', ' + a.country : ''}`, short: name, lat: +r.lat, lon: +r.lon, cat,
         region: a.state || a.region || a.county || a.country || name, country: a.country || '', cc: a.country_code || '',
         city: city || a.state || '', hours: r.extratags?.opening_hours || '',
-        tags: [...new Set([r.type, r.extratags?.cuisine].filter(Boolean).flatMap(x => String(x).split(';')).map(x => x.replace(/_/g, ' ').trim()).filter(x => x && x.toLowerCase() !== cat.toLowerCase()))].slice(0, 3)
+        tags: [...new Set([r.type, r.extratags?.cuisine].filter(Boolean).flatMap(x => String(x).split(';')).map(x => x.replace(/_/g, ' ').trim()).filter(x => x && x.toLowerCase() !== cat.toLowerCase()).map(tagDe))].slice(0, 3), dl: 1
       };
     });
   }
@@ -95,7 +127,7 @@
 
   // ---------- Map ----------
   const map = L.map('map', { zoomControl: false, attributionControl: false, minZoom: 2 }).setView([20, 0], 2);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, className: 'soft-tiles' }).addTo(map);
+  L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', { maxZoom: 18, className: 'soft-tiles' }).addTo(map);
   let markers = {};
   const visibleSpots = () => db.spots.filter(s => !filter || (filter === 'Must Do' ? s.fav : s.cat === filter));
 
@@ -123,7 +155,7 @@
   function renderChips() {
     const cats = [...new Set(db.spots.map(s => s.cat))];
     const items = [['Must Do', '❤️']].concat(cats.map(c => [c, CATS[c] || '📍']));
-    $('#chips').innerHTML = items.map(([n, e]) => `<button class="chip ${filter === n ? 'on' : ''}" data-f="${esc(n)}">${e} ${esc(n)}</button>`).join('');
+    $('#chips').innerHTML = items.map(([n, e]) => `<button class="chip ${filter === n ? 'on' : ''}" data-f="${esc(n)}">${e} ${esc(dc(n))}</button>`).join('');
     $('#chips').style.display = db.spots.length && !countryMode ? '' : 'none';
   }
   function renderPreview() {
@@ -179,7 +211,7 @@
     const link = urlIn(raw), isLink = !!link;
     const pastedText = $('#addText').value.trim() || (isLink ? raw.replace(link, '').trim() : '');
     const token = ++loadToken;
-    $('#loadSub').textContent = isLink ? 'Reading your video' : 'Searching the map';
+    $('#loadSub').textContent = isLink ? 'Video wird gelesen' : 'Karte wird durchsucht';
     openSheet('#sheetLoading');
     try {
       let source = { url: '', title: raw, author: '', caption: '', hashtags: [] };
@@ -197,13 +229,15 @@
           return toast('Ohne Login gibt Instagram nichts preis – füge die Beschreibung unten ein');
         }
         cands = source.candidates || [];
+        if (source.caption && !isGerman(source.caption)) { $('#loadSub').textContent = 'Beschreibung wird übersetzt'; source.caption_de = await toDe(source.caption); }
+        for (const c of cands) if (c.note && !isGerman(c.note)) c.note = await toDe(c.note);
       }
       // Kandidaten in Orte umwandeln (Nominatim: max. 1 Anfrage pro Sekunde)
       const strong = cands.filter(c => c.conf !== 'low'), usable = (strong.length ? strong : cands.slice(0, 3)).slice(0, 8);
       const found = [], ctxHint = source.location_context || '';
       for (let i = 0; i < usable.length; i++) {
         const c = usable[i];
-        $('#loadSub').textContent = isLink ? `Looking up ${c.name}` : 'Searching the map';
+        $('#loadSub').textContent = isLink ? `Suche ${c.name}` : 'Karte wird durchsucht';
         if (i) await sleep(1100);
         if (token !== loadToken) return;
         const q = [c.name, c.context || (c.conf === 'high' || c.conf === 'medium' ? ctxHint : '')].filter(Boolean).join(', ');
@@ -225,13 +259,13 @@
   function showFound(source, results, noText) {
     pending = { source, results: results.map((r, i) => ({ ...r, picked: r.picked ?? (r.conf ? false : i === 0) })), colls: new Set() };
     const n = results.length;
-    $('#foundTitle').innerHTML = n ? `Mio² found <span>${n}</span> spot${n === 1 ? '' : 's'}!` : 'Nothing found yet';
-    $('#sharedToday').textContent = `${db.spots.filter(s => s.added === today()).length} shared today`;
+    $('#foundTitle').innerHTML = n ? `Mio² hat <span>${n}</span> ${n === 1 ? 'Spot' : 'Spots'} gefunden!` : 'Noch nichts gefunden';
+    $('#sharedToday').textContent = `${db.spots.filter(s => s.added === today()).length} heute geteilt`;
     const st = db.streak.day === today() ? db.streak.n : (db.streak.day === yesterday() ? db.streak.n + 1 : 1);
     $('#streak').textContent = `${st} 🔥`;
     $('#sourceCard').style.display = source.url ? '' : 'none';
     $('#sourceCard').innerHTML = `${source.thumb ? `<img class="ph" src="${esc(source.thumb)}" alt="">` : '<div class="ph"></div>'}
-      <div class="t"><div>${esc((source.caption || source.title || source.url).replace(/\s+/g, ' '))}</div><div class="a">${source.platform === 'instagram' ? '◎' : '♪'} ${esc(source.author || host(source.url))}</div>${(source.hashtags || []).length ? `<div class="h">${esc(source.hashtags.slice(0, 5).map(h => '#' + h).join(' '))}</div>` : ''}</div>`;
+      <div class="t"><div>${esc((source.caption_de || source.caption || source.title || source.url).replace(/\s+/g, ' '))}</div><div class="a">${source.platform === 'instagram' ? '◎' : '♪'} ${esc(source.author || host(source.url))}</div>${(source.hashtags || []).length ? `<div class="h">${esc(source.hashtags.slice(0, 5).map(h => '#' + h).join(' '))}</div>` : ''}</div>`;
     renderFound(source.url ? 'Mio² hat in dem Post keinen eindeutigen Ort gefunden. Füge die Beschreibung ein oder suche den Ort direkt.' : '');
     renderCollChips();
     openSheet('#sheetFound');
@@ -241,14 +275,14 @@
     if (!pending.results.length) l.innerHTML = `<div class="empty">${esc(msg || 'Kein Ort gefunden. Versuche einen genaueren Namen.')}</div>`;
     else l.innerHTML = pending.results.map((r, i) => `<button class="found-item" data-i="${i}">
       ${r.img ? `<img src="${esc(r.img)}" alt="">` : '<div class="ph"></div>'}
-      <div class="n"><b>${esc(r.name)}</b><small>${CATS[r.cat] || ''} ${esc(r.cat)}${r.conf === 'low' ? ' · vage' : ''}${r.tip ? ' · ' + esc(r.tip) : ''}</small></div>
+      <div class="n"><b>${esc(r.name)}</b><small>${CATS[r.cat] || ''} ${esc(dc(r.cat))}${r.conf === 'low' ? ' · vage' : ''}${r.tip ? ' · ' + esc(r.tip) : ''}</small></div>
       <span class="check ${r.picked ? 'on' : ''}">${icon.check}</span></button>`).join('');
     const c = pending.results.filter(r => r.picked).length;
     $('#saveCount').textContent = c; $('#btnSave').disabled = !c; $('#btnSave').style.opacity = c ? 1 : .4;
   }
   $('#foundList').onclick = e => { const b = e.target.closest('.found-item'); if (!b) return; const r = pending.results[+b.dataset.i]; r.picked = !r.picked; renderFound(); };
   function renderCollChips() {
-    $('#collChips').innerHTML = db.collections.map(c => `<button class="cchip ${pending.colls.has(c) ? 'on' : ''}" data-c="${esc(c)}">${esc(c)}</button>`).join('') + `<button class="cchip new" data-new>+ New collection</button>`;
+    $('#collChips').innerHTML = db.collections.map(c => `<button class="cchip ${pending.colls.has(c) ? 'on' : ''}" data-c="${esc(c)}">${esc(c)}</button>`).join('') + `<button class="cchip new" data-new>+ Neue Sammlung</button>`;
   }
   $('#collChips').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -267,7 +301,7 @@
         db.spots.push(s);
       }
       pending.colls.forEach(c => !s.collections.includes(c) && s.collections.push(c));
-      if (pending.source.url && !s.sources.some(x => x.url === pending.source.url)) { const p = pending.source; s.sources.push({ url: p.url, platform: p.platform, author: p.author, caption: p.caption || p.title || '', hashtags: p.hashtags || [], mentions: p.mentions || [], location: p.location || '', thumb: p.thumb || '' }); }
+      if (pending.source.url && !s.sources.some(x => x.url === pending.source.url)) { const p = pending.source; s.sources.push({ url: p.url, platform: p.platform, author: p.author, caption: p.caption || p.title || '', caption_de: p.caption_de || '', hashtags: p.hashtags || [], mentions: p.mentions || [], location: p.location || '', thumb: p.thumb || '' }); }
       last = s;
     });
     db.streak = { day: today(), n: parseInt($('#streak').textContent) || 1 };
@@ -284,19 +318,19 @@
     $('#dName').textContent = s.short;
     $('#dSub').textContent = [s.city, s.country].filter(Boolean).join(', ') || s.region;
     $('#dHours').textContent = s.hours ? `🕒 ${s.hours}` : '';
-    $('#dTags').innerHTML = `<span class="tag cat">${CATS[s.cat] || ''} ${esc(s.cat)}</span>` + (s.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('');
+    $('#dTags').innerHTML = `<span class="tag cat">${CATS[s.cat] || ''} ${esc(dc(s.cat))}</span>` + (s.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('');
     const first = (s.desc || '').split(/(?<=[.!?])\s/)[0] || '';
-    $('#dTldr').innerHTML = first ? `<b>tldr;</b>${esc(first.length > 170 ? first.slice(0, 167) + '…' : first)}` : '';
+    $('#dTldr').innerHTML = first ? `<b>Kurz gesagt:</b>${esc(first.length > 170 ? first.slice(0, 167) + '…' : first)}` : '';
     $('#dDesc').textContent = (s.desc || '').slice(first.length).trim();
     $('#dNote').value = s.note || '';
     const imgs = [...new Set([s.hero, s.img].filter(Boolean))].concat((s.sources || []).map(x => x.thumb).filter(Boolean));
     $('#dGallery').innerHTML = imgs.map(u => `<img src="${esc(u)}" alt="">`).join('');
     const trips = db.trips.filter(t => t.items.some(i => i.spotId === s.id)).map(t => `✈️ ${esc(t.name)}`);
     $('#dColls').innerHTML = s.collections.map(c => `<span class="cchip on">${esc(c)}</span>`).join('') + trips.map(t => `<span class="cchip">${t}</span>`).join('');
-    $('#dPost').innerHTML = (s.sources || []).map(p => `<div class="post"><div class="ph-row">${p.thumb ? `<img src="${esc(p.thumb)}" alt="">` : ''}<div><a href="${esc(p.url)}" target="_blank" rel="noopener">${p.platform === 'instagram' ? '◎' : '♪'} ${esc(p.author || host(p.url))}</a>${p.location ? `<div class="loc">📍 ${esc(p.location)}</div>` : ''}</div></div>${p.caption ? `<p>${esc(p.caption)}</p>` : ''}${(p.hashtags || []).length ? `<div class="tags">${p.hashtags.map(h => `<span class="tag">#${esc(h)}</span>`).join('')}</div>` : ''}</div>`).join('');
+    $('#dPost').innerHTML = (s.sources || []).map(p => `<div class="post"><div class="ph-row">${p.thumb ? `<img src="${esc(p.thumb)}" alt="">` : ''}<div><a href="${esc(p.url)}" target="_blank" rel="noopener">${p.platform === 'instagram' ? '◎' : '♪'} ${esc(p.author || host(p.url))}</a>${p.location ? `<div class="loc">📍 ${esc(p.location)}</div>` : ''}</div></div>${p.caption ? `<p>${esc(p.caption_de || p.caption)}</p>${p.caption_de && p.caption_de !== p.caption ? `<details class="orig"><summary>Original anzeigen</summary><p>${esc(p.caption)}</p></details>` : ''}` : ''}${(p.hashtags || []).length ? `<div class="tags">${p.hashtags.map(h => `<span class="tag">#${esc(h)}</span>`).join('')}</div>` : ''}</div>`).join('');
     $('#dFav').classList.toggle('on', s.fav);
     const src = (s.sources || [])[0];
-    $('#dSource').style.display = src ? '' : 'none'; if (src) { $('#dSource').href = src.url; $('#dSource').textContent = (src.platform === 'instagram' || host(src.url).includes('instagram')) ? '◎ source' : '♪ source'; }
+    $('#dSource').style.display = src ? '' : 'none'; if (src) { $('#dSource').href = src.url; $('#dSource').textContent = (src.platform === 'instagram' || host(src.url).includes('instagram')) ? '◎ Quelle' : '♪ Quelle'; }
     $('#dDirections').href = dirUrl(s);
     openSheet('#sheetDetail');
   }
@@ -345,9 +379,9 @@
   // ---------- Library ----------
   $('#tabLibrary').onclick = () => { libView = { v: 'home' }; libQuery = ''; renderLibrary(); openSheet('#sheetLibrary'); };
   const NAV = [
-    ['trips', '✈️', () => `Trips (${db.trips.length})`], ['colls', '🗂', () => `Your collections (${db.collections.length})`],
-    ['countries', '🗺', () => `Countries (${new Set(db.spots.map(s => s.cc).filter(Boolean)).size})`],
-    ['all', '🔖', () => `All saves (${db.spots.length})`], ['favs', '🧡', () => `Favs (${db.spots.filter(s => s.fav).length})`]
+    ['trips', '✈️', () => `Trips (${db.trips.length})`], ['colls', '🗂', () => `Deine Sammlungen (${db.collections.length})`],
+    ['countries', '🗺', () => `Länder (${new Set(db.spots.map(s => s.cc).filter(Boolean)).size})`],
+    ['all', '🔖', () => `Alle Spots (${db.spots.length})`], ['favs', '🧡', () => `Favoriten (${db.spots.filter(s => s.fav).length})`]
   ];
   const cover = s => s?.img ? `background-image:url('${esc(s.img)}')` : '';
   function cardHtml(s) { return `<button class="card" data-id="${s.id}" style="${cover(s)}">${s.fav ? '<i>♥</i>' : ''}<span>${esc(s.short)}</span></button>`; }
@@ -355,7 +389,7 @@
     const head = $('#libHead'), body = $('#libBody');
     const v = libView.v;
     if (v === 'home') {
-      head.innerHTML = `<div class="logo small">Mio²</div><input class="lib-search" id="libSearch" placeholder="Search" value="${esc(libQuery)}"><button class="round" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+      head.innerHTML = `<div class="logo small">Mio²</div><input class="lib-search" id="libSearch" placeholder="Suchen" value="${esc(libQuery)}"><button class="round" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
       head.querySelector('[data-close]').onclick = closeSheets;
       const q = libQuery.trim().toLowerCase();
       if (q) {
@@ -364,14 +398,14 @@
       } else {
         const recents = db.spots.slice().reverse().slice(0, 12);
         body.innerHTML = `<div class="lib-nav">${NAV.map(([k, e, t]) => `<button data-nav="${k}"><span class="ico">${e}</span>${t()}${icon.chev}</button>`).join('')}</div>
-          <div class="tiles"><button class="tile new" data-newcoll><div class="cv"><span><b>+</b>New<br>Collection</span></div></button>
+          <div class="tiles"><button class="tile new" data-newcoll><div class="cv"><span><b>+</b>Neue<br>Sammlung</span></div></button>
           ${db.collections.map(c => { const f = db.spots.find(s => s.collections.includes(c) && s.img); return `<button class="tile" data-coll="${esc(c)}"><div class="cv" style="${cover(f)}"></div>${esc(c)}</button>`; }).join('')}</div>
-          <h2 class="sec-t">Recently Added</h2>${recents.length ? `<div class="grid">${recents.map(cardHtml).join('')}</div>` : '<div class="empty big">Noch nichts gespeichert. Tippe auf +.</div>'}`;
+          <h2 class="sec-t">Zuletzt hinzugefügt</h2>${recents.length ? `<div class="grid">${recents.map(cardHtml).join('')}</div>` : '<div class="empty big">Noch nichts gespeichert. Tippe auf +.</div>'}`;
       }
       const si = $('#libSearch'); si.oninput = e => { libQuery = e.target.value; const pos = e.target.selectionStart; renderLibrary(); const n = $('#libSearch'); n.focus({ preventScroll: true }); n.setSelectionRange(pos, pos); };
       return;
     }
-    const titles = { trips: 'Trips', colls: 'Your collections', all: 'All saves', favs: 'Favs', coll: libView.name };
+    const titles = { trips: 'Trips', colls: 'Deine Sammlungen', all: 'Alle Spots', favs: 'Favoriten', coll: libView.name };
     head.innerHTML = `<button class="round" id="libBack" aria-label="Zurück"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><div class="sub-title">${esc(titles[v] || '')}</div>${v === 'trips' ? '<button class="btn orange" id="libNewTrip">+ Trip</button>' : ''}`;
     $('#libBack').onclick = () => { libView = v === 'coll' && libView.from === 'colls' ? { v: 'colls' } : { v: 'home' }; renderLibrary(); };
     if (v === 'trips') {
@@ -392,7 +426,7 @@
     const nav = e.target.closest('[data-nav]');
     if (nav) {
       const k = nav.dataset.nav;
-      if (k === 'countries') { if (!db.spots.length) return toast('Noch keine Spots'); closeSheets(); countryMode = true; setRegion('Countries'); map.fitBounds(db.spots.map(s => [s.lat, s.lon]), { padding: [70, 70], maxZoom: 5 }); refresh(); return; }
+      if (k === 'countries') { if (!db.spots.length) return toast('Noch keine Spots'); closeSheets(); countryMode = true; setRegion('Länder'); map.fitBounds(db.spots.map(s => [s.lat, s.lon]), { padding: [70, 70], maxZoom: 5 }); refresh(); return; }
       libView = { v: k }; renderLibrary(); return;
     }
     if (e.target.closest('[data-newcoll]')) { const n = (prompt('Name der Sammlung') || '').trim(); if (n && !db.collections.includes(n)) { db.collections.push(n); save(); renderLibrary(); } return; }
@@ -427,17 +461,17 @@
     $('#tabIt').classList.toggle('on', tripTab === 'it'); $('#tabUn').classList.toggle('on', tripTab === 'un');
     const n = dayCount(t); if (tripDay >= n) tripDay = n - 1;
     const dc = $('#dayChips'); dc.style.display = tripTab === 'it' ? '' : 'none';
-    dc.innerHTML = Array.from({ length: n }, (_, i) => `<button class="chip ${i === tripDay ? 'on' : ''}" data-d="${i}">Day ${i + 1}</button>`).join('') + `<button class="chip" data-d="add">+</button>`;
+    dc.innerHTML = Array.from({ length: n }, (_, i) => `<button class="chip ${i === tripDay ? 'on' : ''}" data-d="${i}">Tag ${i + 1}</button>`).join('') + `<button class="chip" data-d="add">+</button>`;
     const body = $('#tripBody');
     const row = i => {
       const s = spotById(i.spotId);
       if (!i.spotId) return `<div class="ev custom"><div class="tx"><b>${esc(i.title)}</b></div><span class="tm"><input type="time" value="${i.time || ''}" data-time="${i.id}"></span><button class="more" data-more="${i.id}">${icon.dots}</button></div>`;
       if (!s) return '';
-      return `<div class="ev"><div class="th" style="${cover(s)}">${s.fav ? '<i>♥</i>' : ''}</div><div class="tx" data-open="${s.id}"><div class="tm"><input type="time" value="${i.time || ''}" data-time="${i.id}"></div><b>${esc(s.short)}</b><small>${CATS[s.cat] || ''} ${esc(s.cat)} • ${esc([s.city, s.country].filter(Boolean).join(', '))}</small></div><button class="more" data-more="${i.id}">${icon.dots}</button></div>`;
+      return `<div class="ev"><div class="th" style="${cover(s)}">${s.fav ? '<i>♥</i>' : ''}</div><div class="tx" data-open="${s.id}"><div class="tm"><input type="time" value="${i.time || ''}" data-time="${i.id}"></div><b>${esc(s.short)}</b><small>${CATS[s.cat] || ''} ${esc(dc(s.cat))} • ${esc([s.city, s.country].filter(Boolean).join(', '))}</small></div><button class="more" data-more="${i.id}">${icon.dots}</button></div>`;
     };
     if (tripTab === 'it') {
       const items = t.items.filter(i => i.day === tripDay).sort((a, b) => (a.time || '99') < (b.time || '99') ? -1 : (a.time || '99') > (b.time || '99') ? 1 : 0);
-      body.innerHTML = `<div class="addline"><button id="addCustom">+ Add custom event</button></div>` + (items.map(row).join('') || '<div class="empty">Noch nichts für diesen Tag. Plane Spots aus „Unscheduled“ ein.</div>');
+      body.innerHTML = `<div class="addline"><button id="addCustom">+ Eigenen Termin hinzufügen</button></div>` + (items.map(row).join('') || '<div class="empty">Noch nichts für diesen Tag. Plane Spots aus „Unscheduled“ ein.</div>');
       const sp = items.map(i => spotById(i.spotId)).filter(Boolean);
       drawRoute(sp.map(s => [s.lat, s.lon]));
       let u = ''; if (sp.length) { const d = sp[sp.length - 1]; u = `https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lon}`; if (sp.length > 1) u += `&origin=${sp[0].lat},${sp[0].lon}` + (sp.length > 2 ? `&waypoints=${sp.slice(1, -1).map(s => s.lat + ',' + s.lon).join('|')}` : ''); }
@@ -470,14 +504,14 @@
     const t = trip();
     if (e.target.closest('#addCustom')) { const title = (prompt('Titel des Events, z. B. „Mala Spa“') || '').trim(); if (title) { t.items.push({ id: uid(), spotId: null, title, day: tripDay, time: '' }); save(); renderTrip(); } return; }
     if (e.target.closest('#addSpotToTrip')) {
-      openPick('Spot hinzufügen', () => db.spots.filter(s => !t.items.some(i => i.spotId === s.id)).map(s => ({ label: s.short, sub: s.cat, fn: () => { t.items.push({ id: uid(), spotId: s.id, day: null, time: '' }); save(); renderTrip(); } })));
+      openPick('Spot hinzufügen', () => db.spots.filter(s => !t.items.some(i => i.spotId === s.id)).map(s => ({ label: s.short, sub: dc(s.cat), fn: () => { t.items.push({ id: uid(), spotId: s.id, day: null, time: '' }); save(); renderTrip(); } })));
       return;
     }
     const more = e.target.closest('[data-more]');
     if (more) {
       const it = t.items.find(x => x.id === more.dataset.more); const n = dayCount(t);
-      openPick('Event', () => Array.from({ length: n }, (_, d) => ({ label: `Auf Day ${d + 1} legen`, fn: () => { it.day = d; save(); renderTrip(); } }))
-        .concat([{ label: 'Unscheduled', fn: () => { it.day = null; save(); renderTrip(); } }, { label: 'Entfernen', fn: () => { t.items = t.items.filter(x => x.id !== it.id); save(); renderTrip(); } }]));
+      openPick('Termin', () => Array.from({ length: n }, (_, d) => ({ label: `Auf Tag ${d + 1} legen`, fn: () => { it.day = d; save(); renderTrip(); } }))
+        .concat([{ label: 'Nicht eingeplant', fn: () => { it.day = null; save(); renderTrip(); } }, { label: 'Entfernen', fn: () => { t.items = t.items.filter(x => x.id !== it.id); save(); renderTrip(); } }]));
       return;
     }
     const open = e.target.closest('[data-open]'); if (open && !e.target.closest('input')) { const id = open.dataset.open; selectedId = id; setRegion(spotById(id).region); refresh(); openDetail(id); }
@@ -502,10 +536,10 @@
   const inView = () => { const b = map.getBounds(); const l = db.spots.filter(s => b.contains([s.lat, s.lon])); return l.length ? l : db.spots; };
   function renderRoll() {
     const l = inView();
-    $('#rollLoc').textContent = `📍 ${region || 'Everywhere'} · ${l.length} in view`;
+    $('#rollLoc').textContent = `📍 ${region || 'Überall'} · ${l.length} im Kartenausschnitt`;
     const cnt = g => l.filter(s => GROUPS[g].includes(s.cat)).length;
-    $('#rollChips').innerHTML = `<button class="chip ${rollGroup === 'Any' ? 'on' : ''}" data-g="Any">Any</button>` +
-      Object.keys(GROUPS).map(g => `<button class="chip ${rollGroup === g ? 'on' : ''}" data-g="${g}">${g} <small>${cnt(g)}</small></button>`).join('');
+    $('#rollChips').innerHTML = `<button class="chip ${rollGroup === 'Any' ? 'on' : ''}" data-g="Any">Alle</button>` +
+      Object.keys(GROUPS).map(g => `<button class="chip ${rollGroup === g ? 'on' : ''}" data-g="${g}">${GROUPD[g] || g} <small>${cnt(g)}</small></button>`).join('');
   }
   $('#rollChips').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; rollGroup = b.dataset.g; renderRoll(); };
   $('#btnRoll').onclick = () => {
@@ -527,6 +561,24 @@
   document.addEventListener('keydown', e => e.key === 'Escape' && closeSheets());
   window.addEventListener('resize', positionTools);
 
+  // bereits gespeicherte Spots nach und nach auf Deutsch umstellen
+  (async function localizeOld() {
+    for (const sp of db.spots) {
+      if (sp.dl) continue;
+      try {
+        await enrich(sp);
+        await sleep(1100);
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&addressdetails=1&accept-language=de&lat=${sp.lat}&lon=${sp.lon}`);
+        const a = (await r.json()).address || {};
+        if (a.country) { sp.country = a.country; sp.name = `${sp.short}, ${a.country}`; }
+        sp.city = a.city || a.town || a.village || a.municipality || a.county || sp.city;
+        sp.region = a.state || a.region || a.county || a.country || sp.region;
+        sp.tags = (sp.tags || []).map(tagDe);
+        for (const so of sp.sources || []) if (so.caption && !so.caption_de && !isGerman(so.caption)) so.caption_de = await toDe(so.caption);
+        sp.dl = 1; save(); refresh();
+      } catch { }
+    }
+  })();
   refresh();
   if (db.spots.length) { const s = db.spots[db.spots.length - 1]; map.setView([s.lat, s.lon], 13); setRegion(s.region); }
   setTimeout(() => { map.invalidateSize(); positionTools(); }, 100);
