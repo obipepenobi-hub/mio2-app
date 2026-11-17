@@ -168,13 +168,15 @@
       <div class="acts"><span class="${s.fav ? 'on' : ''}" id="pvFav">${icon.heart}</span><a href="${dirUrl(s)}" target="_blank" rel="noopener" id="pvDir" style="color:inherit">${icon.nav}</a></div></button>`;
     $('#pv').onclick = e => { if (e.target.closest('#pvFav')) { toggleFav(s.id); return; } if (e.target.closest('#pvDir')) return; openDetail(s.id); };
   }
-  function setRegion(r) { region = r; $('#regionTitle').textContent = r || 'Mio²'; }
+  // Zurück-Pfeil nur zeigen, wenn es etwas zurückzusetzen gibt (Spot/Region/Filter/Länderansicht)
+  const syncBack = () => { $('#btnBack').style.display = (selectedId || region || filter || countryMode) ? '' : 'none'; };
+  function setRegion(r) { region = r; $('#regionTitle').textContent = r || 'Mio²'; syncBack(); }
   function select(id, fly = true) {
     countryMode = false; selectedId = id; const s = spotById(id);
     if (s) { setRegion(s.region); if (fly) map.flyTo([s.lat, s.lon], Math.max(map.getZoom(), 15), { duration: 1.4 }); }
     refresh();
   }
-  function refresh() { renderChips(); renderMarkers(); renderPreview(); positionTools(); }
+  function refresh() { syncBack(); renderChips(); renderMarkers(); renderPreview(); positionTools(); }
   function positionTools() { $('#mapTools').style.bottom = ($('#bottom').offsetHeight + 12) + 'px'; }
   function toggleFav(id) { const s = spotById(id); s.fav = !s.fav; save(); refresh(); if ($('#sheetDetail').classList.contains('open')) openDetail(id); }
 
