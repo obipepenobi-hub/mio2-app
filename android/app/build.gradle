@@ -1,0 +1,57 @@
+plugins { id 'com.android.application' }
+
+// Version kommt aus ../VERSION (ein Ort, wird vom Release-Skript hochgezählt)
+def versionNameStr = new File(rootDir.parentFile, "VERSION").text.trim()
+def vp = versionNameStr.tokenize('.')
+def versionCodeInt = (vp[0] as Integer) * 10000 + (vp[1] as Integer) * 100 + (vp[2] as Integer)
+
+def ksProps = new Properties()
+def ksFile = new File(rootDir, "keystore/keystore.properties")
+if (ksFile.exists()) ksProps.load(new FileInputStream(ksFile))
+
+// Web-App (liegt eine Ebene höher) in die Assets kopieren
+def webOut = new File(buildDir, "web-assets")
+tasks.register('syncWeb', Copy) {
+    from(rootDir.parentFile) {
+        include 'index.html', 'app.js', 'resolve.js', 'style.css', 'style2.css', 'vendor/**'
+    }
+    into webOut
+}
+preBuild.dependsOn 'syncWeb'
+
+android {
+    namespace 'com.liamkkm.mio'
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.liamkkm.mio"   // NIE ändern, sonst zählt es als andere App
+        minSdk 26
+        targetSdk 34
+        versionCode versionCodeInt
+        versionName versionNameStr
+    }
+    sourceSets { main { assets.srcDir webOut } }
+    signingConfigs {
+        release {
+            if (ksFile.exists()) {
+                storeFile new File(rootDir, 'keystore/' + ksProps['storeFile']); storePassword ksProps['storePassword']
+                keyAlias ksProps['keyAlias']; keyPassword ksProps['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (ksFile.exists()) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildFeatures { buildConfig true }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.webkit:webkit:1.12.1'
+}

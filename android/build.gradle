@@ -1,0 +1,4 @@
+plugins {
+    // AGP 9 bringt Kotlin eingebaut mit – kein separates Kotlin-Plugin.
+    id 'com.android.application' version '9.2.0' apply false
+}
