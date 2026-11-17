@@ -26,6 +26,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var updater: Updater
     private var geoCallback: GeolocationPermissions.Callback? = null
     private var geoOrigin: String? = null
+    private var pageReady = false
+    private var pendingShare: String? = null
 
     // Nur diese Hosts darf der Link-Leser abrufen (wie die Allowlist in server.py)
     private val allowed = listOf("tiktok.com", "instagram.com", "instagr.am", "cdninstagram.com", "fbcdn.net",
@@ -59,6 +61,11 @@ class MainActivity : AppCompatActivity() {
                 return loader.shouldInterceptRequest(u)
             }
 
+            override fun onPageFinished(v: WebView, url: String) {
+                pageReady = true
+                deliverShare()
+            }
+
             override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean {
                 if (r.url.host == "appassets.androidplatform.net") return false
                 try { startActivity(Intent(Intent.ACTION_VIEW, r.url)) } catch (_: Exception) { }
@@ -76,8 +83,28 @@ class MainActivity : AppCompatActivity() {
             }
         }
         web.loadUrl("https://appassets.androidplatform.net/index.html")
+        takeShare(intent)
         // beim Start still nach Updates suchen
         updater.check { i -> if (i != null && i.newer) offer(i) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        takeShare(intent)
+    }
+
+    private fun takeShare(i: Intent?) {
+        if (i?.action == Intent.ACTION_SEND && i.type?.startsWith("text/") == true) {
+            pendingShare = i.getStringExtra(Intent.EXTRA_TEXT)
+            deliverShare()
+        }
+    }
+
+    private fun deliverShare() {
+        val t = pendingShare ?: return
+        if (!pageReady) return
+        pendingShare = null
+        web.evaluateJavascript("window.MioShare && window.MioShare(" + org.json.JSONObject.quote(t) + ")", null)
     }
 
     override fun onRequestPermissionsResult(code: Int, p: Array<out String>, r: IntArray) {

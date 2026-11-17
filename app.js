@@ -530,4 +530,6 @@
   refresh();
   if (db.spots.length) { const s = db.spots[db.spots.length - 1]; map.setView([s.lat, s.lon], 13); setRegion(s.region); }
   setTimeout(() => { map.invalidateSize(); positionTools(); }, 100);
+  // Android-Teilen-Menü: geteilter Text/Link landet direkt im Finden-Dialog
+  window.MioShare = t => { $('#btnAdd').click(); $('#addInput').value = String(t || '').trim(); startFind(); };
 })();
