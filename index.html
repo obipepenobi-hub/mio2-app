@@ -94,6 +94,7 @@
     </div>
     <div class="d-body">
       <div id="dTags" class="tags"></div>
+      <div id="dWhen" class="when"></div>
       <div id="dTldr" class="tldr"></div>
       <p id="dDesc" class="d-desc"></p>
       <textarea id="dNote" class="note" rows="2" placeholder="Deine Notiz, z. B. „unbedingt zum Sonnenaufgang besuchen“"></textarea>
@@ -103,7 +104,6 @@
     </div>
     <div class="d-foot">
       <a class="round big soft" id="dDirections" target="_blank" rel="noopener" aria-label="Route"><svg viewBox="0 0 24 24"><path d="M21 3L3 11l7 3 3 7z"/></svg></a>
-      <a class="btn soft grow" id="dSource" target="_blank" rel="noopener">Quelle</a>
       <button class="btn primary grow" id="dOrganise"><svg viewBox="0 0 24 24" class="ic"><path d="M7 4h10v16l-5-4-5 4z"/></svg>Ordnen</button>
     </div>
   </div>
@@ -157,6 +157,7 @@
     <button class="btn ghost" id="pickClose">Fertig</button>
   </div>
 
+  <div id="popup"><div class="pbox"><h3>📅 Nur zu bestimmten Terminen</h3><div id="popBody"></div><button class="btn primary" id="popOk">Verstanden</button></div></div>
   <div id="toast"></div>
 </div>
 

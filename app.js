@@ -31,6 +31,68 @@
     }
     out = out.trim(); trCache.set(text, out); return out;
   }
+  // Monate/Daten aus der Video-Beschreibung merken (z. B. „Im Dezember: Neujahrsfest“, „31.12.“, „March 3rd“)
+  const MONTH = '(?:Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|March|June|July|October|December|Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Octubre|Noviembre|Diciembre)';
+  const MABBR = '(?:Jan|Feb|Mär|Mar|Apr|Jun|Jul|Aug|Sept?|Okt|Oct|Nov|Dez|Dec|Dic)';
+  const DATE_RE = new RegExp(
+    String.raw`\b${MONTH}\b|\bMay\s+\d{1,2}\b|\b\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?May\b|\b\d{1,2}\.?\s*${MABBR}\b\.?|\b${MABBR}\.?\s+\d{1,2}\b` +
+    String.raw`|\b[0-3]?\d[./](?:0?[1-9]|1[0-2])(?:[./]\d{2,4}|\.)(?!\d)|\b[0-3]?\d/(?:0?[1-9]|1[0-2])\b`, 'i');
+  function whenNotes(text) {
+    const clean = String(text || '').replace(/https?:\/\/\S+|[#@][\w.]+/g, ' ').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, ' ');
+    const out = [];
+    for (let part of clean.split(/(?<=[!?])\s+|(?<=\D\.)\s+|\n+/)) {
+      part = part.replace(/\s+/g, ' ').trim();
+      if (part.length < 4 || !DATE_RE.test(part)) continue;
+      // „may“ als Verb ausschließen (nur „May“ mit Zahl zählt, siehe Regex)
+      if (part.length > 160) { const m = part.match(DATE_RE); const i = m.index; part = '…' + part.slice(Math.max(0, i - 70), i + 90).trim() + '…'; }
+      if (!out.includes(part)) out.push(part);
+    }
+    return out.slice(0, 4);
+  }
+  // ---------- Termin-Warnung bei der Trip-Planung ----------
+  const MNUM = { januar: 1, january: 1, enero: 1, jan: 1, februar: 2, february: 2, febrero: 2, feb: 2, 'märz': 3, maerz: 3, march: 3, marzo: 3, 'mär': 3, mar: 3, april: 4, abril: 4, apr: 4, mai: 5, may: 5, mayo: 5, juni: 6, june: 6, junio: 6, jun: 6, juli: 7, july: 7, julio: 7, jul: 7, august: 8, agosto: 8, aug: 8, september: 9, septiembre: 9, sep: 9, sept: 9, oktober: 10, october: 10, octubre: 10, okt: 10, oct: 10, november: 11, noviembre: 11, nov: 11, dezember: 12, december: 12, diciembre: 12, dez: 12, dec: 12, dic: 12 };
+  const MNAME = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  const AMBIG = new Set(['jan', 'feb', 'mär', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'sept', 'okt', 'oct', 'nov', 'dez', 'dec', 'dic', 'may', 'mai']);
+  const MON_RE = new RegExp(String.raw`\b(${Object.keys(MNUM).sort((a, b) => b.length - a.length).join('|')})\b\.?`, 'gi');
+  function eventDates(note) {
+    const out = [];
+    for (const m of note.matchAll(/\b([0-3]?\d)[./](0?[1-9]|1[0-2])(?:[./]\d{2,4}|\.)(?!\d)|\b([0-3]?\d)\/(0?[1-9]|1[0-2])\b/g))
+      out.push({ d: +(m[1] || m[3]), m: +(m[2] || m[4]) });
+    for (const m of note.matchAll(MON_RE)) {
+      const key = m[1].toLowerCase();
+      const before = note.slice(Math.max(0, m.index - 14), m.index).match(/(\d{1,2})(?:st|nd|rd|th)?\.?\s*(?:of\s+)?$/);
+      const after = note.slice(m.index + m[0].length).match(/^\s*(\d{1,2})\b(?!\d)/);
+      const d = before ? +before[1] : after ? +after[1] : null;
+      if (AMBIG.has(key) && !d && !(m[1][0] === m[1][0].toUpperCase() && key.length > 3)) continue;
+      if (d !== null && (d < 1 || d > 31)) continue;
+      out.push({ d, m: MNUM[key] });
+    }
+    return out;
+  }
+  const evLabel = e => e.d ? `${e.d}. ${MNAME[e.m]}` : MNAME[e.m];
+  const isoDay = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+  function eventStatus(spot, t, dayIdx) {
+    const rows = [];
+    for (const note of spot.when || []) {
+      const evs = eventDates(note); if (!evs.length) continue;
+      const label = evs.map(evLabel).join(' / ');
+      if (!t || !t.start) { rows.push({ spot, note, st: 'nodates', text: `Gilt zu diesem Termin: ${label}. Trage oben Reisedaten ein, dann prüfe ich, ob es passt.` }); continue; }
+      const a = new Date(t.start + 'T00:00'), b = new Date((t.end || t.start) + 'T00:00');
+      let days = [];
+      if (dayIdx !== null && dayIdx !== undefined) days = [new Date(a.getTime() + dayIdx * 864e5)];
+      else for (let x = new Date(a); x <= b && days.length < 370; x = new Date(x.getTime() + 864e5)) days.push(x);
+      const hit = days.some(x => evs.some(e => e.m === x.getMonth() + 1 && (!e.d || e.d === x.getDate())));
+      const where = dayIdx !== null && dayIdx !== undefined ? `Tag ${dayIdx + 1} (${fmtDate(isoDay(days[0]))})` : `${fmtDate(t.start)} – ${fmtDate(t.end || t.start)}`;
+      rows.push({ spot, note, st: hit ? 'ok' : 'miss', text: hit ? `✅ Passt: ${where} liegt im richtigen Zeitraum (${label}).` : `⚠️ Passt nicht: ${where} liegt nicht im Zeitraum (${label}).` });
+    }
+    return rows;
+  }
+  function showEvents(rows) {
+    if (!rows.length) return;
+    $('#popBody').innerHTML = rows.map(r => `<div class="prow ${r.st}"><b>${esc(r.spot.short)}</b><div class="pn">📅 ${esc(r.note)}</div><div class="ps">${esc(r.text)}</div></div>`).join('');
+    $('#popup').classList.add('open');
+  }
+  const warnEvents = (spots, t, dayIdx) => showEvents(spots.flatMap(sp => eventStatus(sp, t, dayIdx)));
   const GROUPS = { Eat: ['Restaurant', 'Cafe'], 'Night out': ['Bar'], Adventure: ['Nature'], Shopping: ['Shopping'], Sights: ['Attraction', 'Hotel'] };
 
   // ---------- State ----------
@@ -173,7 +235,7 @@
   function setRegion(r) { region = r; $('#regionTitle').textContent = r || 'Mio²'; syncBack(); }
   function select(id, fly = true) {
     countryMode = false; selectedId = id; const s = spotById(id);
-    if (s) { setRegion(s.region); if (fly) map.flyTo([s.lat, s.lon], Math.max(map.getZoom(), 15), { duration: 1.4 }); }
+    if (s) { setRegion(s.region); if (fly) { try { map.flyTo([s.lat, s.lon], Math.max(map.getZoom(), 15), { duration: 1.4 }); } catch { map.setView([s.lat, s.lon], 15); } } }
     refresh();
   }
   function refresh() { syncBack(); renderChips(); renderMarkers(); renderPreview(); positionTools(); }
@@ -200,6 +262,7 @@
   }
   function closePick() { $('#sheetPick').classList.remove('open'); syncScrim(); }
   $('#pickClose').onclick = closePick;
+  $('#popOk').onclick = () => $('#popup').classList.remove('open');
 
   // ---------- Add flow ----------
   $('#btnAdd').onclick = () => { $('#addInput').value = ''; $('#addText').value = ''; $('#addText').style.display = 'none'; openSheet('#sheetAdd'); setTimeout(() => $('#addInput').focus({ preventScroll: true }), 350); };
@@ -304,6 +367,8 @@
       }
       pending.colls.forEach(c => !s.collections.includes(c) && s.collections.push(c));
       if (pending.source.url && !s.sources.some(x => x.url === pending.source.url)) { const p = pending.source; s.sources.push({ url: p.url, platform: p.platform, author: p.author, caption: p.caption || p.title || '', caption_de: p.caption_de || '', hashtags: p.hashtags || [], mentions: p.mentions || [], location: p.location || '', thumb: p.thumb || '' }); }
+      const w = whenNotes(pending.source.caption_de || pending.source.caption || pending.source.title);
+      if (w.length) s.when = [...new Set([...(s.when || []), ...w])].slice(0, 6);
       last = s;
     });
     db.streak = { day: today(), n: parseInt($('#streak').textContent) || 1 };
@@ -322,6 +387,7 @@
     $('#dHours').textContent = s.hours ? `🕒 ${s.hours}` : '';
     $('#dTags').innerHTML = `<span class="tag cat">${CATS[s.cat] || ''} ${esc(dc(s.cat))}</span>` + (s.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('');
     const first = (s.desc || '').split(/(?<=[.!?])\s/)[0] || '';
+    $('#dWhen').innerHTML = (s.when || []).map(w => `<div>📅 ${esc(w)}</div>`).join('');
     $('#dTldr').innerHTML = first ? `<b>Kurz gesagt:</b>${esc(first.length > 170 ? first.slice(0, 167) + '…' : first)}` : '';
     $('#dDesc').textContent = (s.desc || '').slice(first.length).trim();
     $('#dNote').value = s.note || '';
@@ -331,8 +397,6 @@
     $('#dColls').innerHTML = s.collections.map(c => `<span class="cchip on">${esc(c)}</span>`).join('') + trips.map(t => `<span class="cchip">${t}</span>`).join('');
     $('#dPost').innerHTML = (s.sources || []).map(p => `<div class="post"><div class="ph-row">${p.thumb ? `<img src="${esc(p.thumb)}" alt="">` : ''}<div><a href="${esc(p.url)}" target="_blank" rel="noopener">${p.platform === 'instagram' ? '◎' : '♪'} ${esc(p.author || host(p.url))}</a>${p.location ? `<div class="loc">📍 ${esc(p.location)}</div>` : ''}</div></div>${p.caption ? `<p>${esc(p.caption_de || p.caption)}</p>${p.caption_de && p.caption_de !== p.caption ? `<details class="orig"><summary>Original anzeigen</summary><p>${esc(p.caption)}</p></details>` : ''}` : ''}${(p.hashtags || []).length ? `<div class="tags">${p.hashtags.map(h => `<span class="tag">#${esc(h)}</span>`).join('')}</div>` : ''}</div>`).join('');
     $('#dFav').classList.toggle('on', s.fav);
-    const src = (s.sources || [])[0];
-    $('#dSource').style.display = src ? '' : 'none'; if (src) { $('#dSource').href = src.url; $('#dSource').textContent = (src.platform === 'instagram' || host(src.url).includes('instagram')) ? '◎ Quelle' : '♪ Quelle'; }
     $('#dDirections').href = dirUrl(s);
     openSheet('#sheetDetail');
   }
@@ -373,8 +437,8 @@
   function pickTrip(s) {
     openPick('Zu Trip hinzufügen', () => db.trips.map(t => {
       const has = t.items.some(i => i.spotId === s.id);
-      return { label: t.name, on: has, fn: () => { t.items = has ? t.items.filter(i => i.spotId !== s.id) : [...t.items, { id: uid(), spotId: s.id, day: null, time: '' }]; save(); refreshOpen(s); return false; } };
-    }).concat([{ label: '+ Neuer Trip', plus: true, fn: () => { const t = newTrip(); if (t) { t.items.push({ id: uid(), spotId: s.id, day: null, time: '' }); save(); refreshOpen(s); } return false; } }]));
+      return { label: t.name, on: has, fn: () => { t.items = has ? t.items.filter(i => i.spotId !== s.id) : [...t.items, { id: uid(), spotId: s.id, day: null, time: '' }]; save(); refreshOpen(s); if (!has) warnEvents([s], t, null); return false; } };
+    }).concat([{ label: '+ Neuer Trip', plus: true, fn: () => { const t = newTrip(); if (t) { t.items.push({ id: uid(), spotId: s.id, day: null, time: '' }); save(); refreshOpen(s); warnEvents([s], t, null); } return false; } }]));
   }
   function refreshOpen(s) { drawPick(); if ($('#sheetDetail').classList.contains('open')) openDetail(s.id); if ($('#sheetLibrary').classList.contains('open')) renderLibrary(); }
 
@@ -494,8 +558,9 @@
     else tripDay = +b.dataset.d;
     renderTrip();
   };
-  $('#tStart').onchange = e => { const t = trip(); t.start = e.target.value; if (t.start && (!t.end || t.end < t.start)) t.end = t.start; save(); renderTrip(); };
-  $('#tEnd').onchange = e => { const t = trip(); t.end = e.target.value; if (!t.start) t.start = t.end; save(); renderTrip(); };
+  const checkTripDates = t => showEvents(t.items.flatMap(i => { const sp = spotById(i.spotId); return sp ? eventStatus(sp, t, null).filter(r => r.st !== 'nodates') : []; }));
+  $('#tStart').onchange = e => { const t = trip(); t.start = e.target.value; if (t.start && (!t.end || t.end < t.start)) t.end = t.start; save(); renderTrip(); checkTripDates(t); };
+  $('#tEnd').onchange = e => { const t = trip(); t.end = e.target.value; if (!t.start) t.start = t.end; save(); renderTrip(); checkTripDates(t); };
   $('#tName').onclick = () => { const t = trip(); const n = (prompt('Trip umbenennen', t.name) || '').trim(); if (n) { t.name = n; save(); renderTrip(); } };
   $('#tMenu').onclick = () => openPick('Trip', () => [
     { label: 'Umbenennen', fn: () => { setTimeout(() => $('#tName').click(), 50); } },
@@ -506,13 +571,13 @@
     const t = trip();
     if (e.target.closest('#addCustom')) { const title = (prompt('Titel des Events, z. B. „Mala Spa“') || '').trim(); if (title) { t.items.push({ id: uid(), spotId: null, title, day: tripDay, time: '' }); save(); renderTrip(); } return; }
     if (e.target.closest('#addSpotToTrip')) {
-      openPick('Spot hinzufügen', () => db.spots.filter(s => !t.items.some(i => i.spotId === s.id)).map(s => ({ label: s.short, sub: dc(s.cat), fn: () => { t.items.push({ id: uid(), spotId: s.id, day: null, time: '' }); save(); renderTrip(); } })));
+      openPick('Spot hinzufügen', () => db.spots.filter(s => !t.items.some(i => i.spotId === s.id)).map(s => ({ label: s.short, sub: dc(s.cat), fn: () => { t.items.push({ id: uid(), spotId: s.id, day: null, time: '' }); save(); renderTrip(); warnEvents([s], t, null); } })));
       return;
     }
     const more = e.target.closest('[data-more]');
     if (more) {
       const it = t.items.find(x => x.id === more.dataset.more); const n = dayCount(t);
-      openPick('Termin', () => Array.from({ length: n }, (_, d) => ({ label: `Auf Tag ${d + 1} legen`, fn: () => { it.day = d; save(); renderTrip(); } }))
+      openPick('Termin', () => Array.from({ length: n }, (_, d) => ({ label: `Auf Tag ${d + 1} legen`, fn: () => { it.day = d; save(); renderTrip(); const sp = spotById(it.spotId); if (sp) warnEvents([sp], t, d); } }))
         .concat([{ label: 'Nicht eingeplant', fn: () => { it.day = null; save(); renderTrip(); } }, { label: 'Entfernen', fn: () => { t.items = t.items.filter(x => x.id !== it.id); save(); renderTrip(); } }]));
       return;
     }
@@ -531,6 +596,7 @@
     const n = dayCount(t), per = Math.ceil(ordered.length / n);
     ordered.forEach((i, k) => { i.day = Math.min(n - 1, Math.floor(k / per)); });
     save(); tripTab = 'it'; tripDay = 0; renderTrip(); toast('Trip nach Nähe geplant');
+    showEvents(todo.flatMap(i => { const sp = spotById(i.spotId); return sp ? eventStatus(sp, t, i.day) : []; }));
   };
 
   // ---------- Randomize ----------
@@ -563,6 +629,8 @@
   document.addEventListener('keydown', e => e.key === 'Escape' && closeSheets());
   window.addEventListener('resize', positionTools);
 
+  db.spots.forEach(sp => { if (!sp.when && (sp.sources || []).length) { const w = [...new Set(sp.sources.flatMap(p => whenNotes(p.caption_de || p.caption)))]; if (w.length) sp.when = w.slice(0, 6); } });
+  save();
   // bereits gespeicherte Spots nach und nach auf Deutsch umstellen
   (async function localizeOld() {
     for (const sp of db.spots) {
@@ -584,6 +652,11 @@
   refresh();
   if (db.spots.length) { const s = db.spots[db.spots.length - 1]; map.setView([s.lat, s.lon], 13); setRegion(s.region); }
   setTimeout(() => { map.invalidateSize(); positionTools(); }, 100);
+  // Externe Links (Route, Quelle) in der Android-App über das System öffnen
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="http"]');
+    if (a && window.MioNative && MioNative.open) { e.preventDefault(); MioNative.open(a.href); }
+  });
   // Android-Teilen-Menü: geteilter Text/Link landet direkt im Finden-Dialog
   window.MioShare = t => { $('#btnAdd').click(); $('#addInput').value = String(t || '').trim(); startFind(); };
 })();

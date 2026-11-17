@@ -4,6 +4,7 @@
   python release.py "Was ist neu"            # Patch +1   (1.0.0 -> 1.0.1)
   python release.py "Was ist neu" --minor    # Minor +1   (1.0.3 -> 1.1.0)
   python release.py "Was ist neu" --major
+  (--bridge: zusätzlich ein Release in mio2-app, nur für die Umstellung auf 1.0.5)
 
 Die installierte App prüft beim Start (und per Tipp auf den Avatar) das neueste
 GitHub-Release und bietet das Update an. Voraussetzung: `gh auth login`,
@@ -41,7 +42,11 @@ def main():
     run('git', 'commit', '-m', f'Release v{ver}: {notes}')
     run('git', 'tag', f'v{ver}')
     run('git', 'push', 'origin', 'HEAD', '--tags')
-    run('gh', 'release', 'create', f'v{ver}', out, '--title', f'Mio² {ver}', '--notes', notes)
+    if '--bridge' in sys.argv:  # nur für 1.0.5: alte Apps (<=1.0.4) suchen Updates noch in mio2-app
+        run('gh', 'release', 'create', f'v{ver}', out, '--title', f'Mio² {ver}', '--notes', notes)
+    # Ab jetzt: geprüftes Release im Update-Repo + Kopie in Liams Appstore (incoming-apks/)
+    pub = os.path.join(ROOT, '..', 'mio2-updater', 'tools', 'publish_release.py')
+    run(sys.executable, pub, out, notes, '--appstore')
     print(f'\nFertig: Mio² {ver} veröffentlicht.')
 
 

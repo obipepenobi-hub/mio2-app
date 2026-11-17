@@ -157,12 +157,17 @@ class MainActivity : AppCompatActivity() {
             .setMessage(i.notes.take(600).ifBlank { "Eine neue Version von Mio² ist da." })
             .setPositiveButton("Jetzt aktualisieren") { _, _ ->
                 Toast.makeText(this, "Lade Update …", Toast.LENGTH_SHORT).show()
-                updater.downloadAndInstall(i.url!!) { e -> if (e != null) Toast.makeText(this, e, Toast.LENGTH_LONG).show() }
+                updater.downloadAndInstall(i) { e -> if (e != null) Toast.makeText(this, e, Toast.LENGTH_LONG).show() }
             }.setNegativeButton("Später", null).show()
     }
 
     inner class Bridge {
         @JavascriptInterface fun version(): String = BuildConfig.VERSION_NAME
+
+        @JavascriptInterface fun open(url: String) {
+            if (!url.startsWith("https://") && !url.startsWith("http://")) return
+            runOnUiThread { try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) { } }
+        }
 
         @JavascriptInterface fun checkUpdate() {
             runOnUiThread {
